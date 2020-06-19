@@ -4,12 +4,12 @@ SimpleFileSync is rsync-like script written in Python. Rsync is a great tool, ho
 
 ## Requirements
 
-No 3rd-party packages are used, just pure Python3.
+No 3rd-party packages are used, just pure Python3. Should work on all platforms.
 
 ## Usage
 
 ```
-$ python sfsync.py --help
+> python sfsync.py --help
 
 usage: sfsync.py [-h]
                  [--exclude-folder-names EXCLUDE_FOLDER_NAMES [EXCLUDE_FOLDER_NAMES ...]]
@@ -60,13 +60,13 @@ optional arguments:
 Simply list two file trees and create diff summary for a check:
 
 ```
-python sfsync.py \\net_pc1\\source \\net_pc2\target --summary --dry-run
+> python sfsync.py \\net_pc1\\source \\net_pc2\target --summary --dry-run
 ```
 
 Sync those trees with no summary table:
 
 ```
-python sfsync.py \\net_pc1\\source \\net_pc2\target
+> python sfsync.py \\net_pc1\\source \\net_pc2\target
 ```
 
 ### Exlude stuff:
@@ -75,14 +75,14 @@ python sfsync.py \\net_pc1\\source \\net_pc2\target
 We found out somebody dumped there 60 gigs of images, we don't want that:
 
 ```
-python sfsync.py \\net_pc1\\source \\net_pc2\target --summary --dry-run \
+> python sfsync.py \\net_pc1\\source \\net_pc2\target --summary --dry-run \
         --exclude-folder-names images dumps
 ```
 
 or
 
 ```
-python sfsync.py \\net_pc1\\source \\net_pc2\target --summary --dry-run \
+> python sfsync.py \\net_pc1\\source \\net_pc2\target --summary --dry-run \
         --exclude-file-ext .png .jpg 
 ```
 
@@ -92,21 +92,21 @@ python sfsync.py \\net_pc1\\source \\net_pc2\target --summary --dry-run \
 We want to sync just stuff from source to target:
 
 ```
-python sfsync.py \\net_pc1\\source \\net_pc2\target --summary --dry-run \
+> python sfsync.py \\net_pc1\\source \\net_pc2\target --summary --dry-run \
         --one-direction-sync
 ```
 
 Lets just sync just stuff from source to target and we want to remove additional files (leftovers) from the target. For example we removed some files/folders from the source and we don't want to sync them back from target:
 
 ```
-python sfsync.py \\net_pc1\\source \\net_pc2\target --summary --dry-run \
+> python sfsync.py \\net_pc1\\source \\net_pc2\target --summary --dry-run \
         --one-direction-sync --delete-orphans
 ```
 
 What if we messed up our local copy of files due to some accidental write and we want to revert those changes by overwriting those files from out remote storage. But now local files have newer modification data. Fortunately, we can force this update so instead of copying all from the server, we revert just those few files:
 
 ```
-python sfsync.py \\net_pc1\\source \\net_pc2\target --summary --dry-run \
+> python sfsync.py \\net_pc1\\source \\net_pc2\target --summary --dry-run \
         --one-direction-sync --prefer-source
 ```
 
