@@ -163,6 +163,7 @@ def print_summary(index):
             size_op = "<"
 
         print(F"{direction_str:17s} | {source_time_str} {time_op} {target_time_str} | {sizeof_fmt(source_size)} {size_op} {sizeof_fmt(target_size)} | {relpath}")
+    print()
 
 
 def remove_file(filepath):
@@ -221,9 +222,9 @@ def main():
     index = merge_trees(source_files_info, target_files_info)
     copy_index = get_sync_direction(index)
 
-    print_summary(copy_index)
+    if args.summary:
+        print_summary(copy_index)
 
-    print()
     print(F"Coping started at {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time()))}")
 
     workers = []
@@ -249,7 +250,11 @@ def main():
 
 if __name__ == '__main__':
 
-    arg_parser = argparse.ArgumentParser(description="")
+    arg_parser = argparse.ArgumentParser(description="Simple file sync script is rsync-like tool written in Python. "
+                                                     "It can do simple both-ways sync between source and target file tress. "
+                                                     "Files are compares just based on their file size and last modification date. "
+                                                     "Optionally only one-way sync can be used, files that are on target but not in source can be removed or you can force source "
+                                                     "dir to be considered as the latest and overwrite anything that differs on the target.")
     arg_parser.add_argument("source", type=str, help="Source directory - from where to sync.")
     arg_parser.add_argument("target", type=str, help="Target directory - with which to sync.")
     arg_parser.add_argument("--exclude-folder-names", type=str, nargs="+", default=(), help='Folder names (not paths) that should be excluded. E.g. images, dumps, cache, etc.')
@@ -260,6 +265,8 @@ if __name__ == '__main__':
                                                                           "The result is the same as when you would delete the target folder first and then start coping the "
                                                                           "source dir, but more effective of course.")
     arg_parser.add_argument('--prefer-source', action="store_true", help="When set, source file is always considered to be the latest one.")
+    arg_parser.add_argument('--summary', action="store_true", help="Print summary table with files to be changed. "
+                                                                   " is recommended to be used together with '--dry-run' to find out first, what will be done.")
     arg_parser.add_argument('--dry-run', action="store_true", help="Do not copy / remove anything, just simulate actions.")
 
     args = arg_parser.parse_args()
