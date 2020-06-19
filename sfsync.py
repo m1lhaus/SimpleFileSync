@@ -12,15 +12,6 @@ from colorama import Fore
 from concurrent.futures import ThreadPoolExecutor
 
 
-try:
-    O_BINARY = os.O_BINARY
-except:
-    O_BINARY = 0
-READ_FLAGS = os.O_RDONLY | O_BINARY
-WRITE_FLAGS = os.O_WRONLY | os.O_CREAT | os.O_TRUNC | O_BINARY
-BUFFER_SIZE = 128*1024
-
-
 class Action:
     COPY_SOURCE_TO_TARGET = 0
     COPY_TARGET_TO_SOURCE = 1
@@ -175,23 +166,7 @@ def remove_file(filepath):
 
 def copy_file(src, dst):
     if not args.dry_run:
-        # shutil.copy2(src, dst)
-        try:
-            fin = os.open(src, READ_FLAGS)
-            stat = os.fstat(fin)
-            fout = os.open(dst, WRITE_FLAGS, stat.st_mode)
-            for x in iter(lambda: os.read(fin, BUFFER_SIZE), ""):
-                os.write(fout, x)
-        finally:
-            try:
-                os.close(fin)
-            except:
-                pass
-            try:
-                os.close(fout)
-            except:
-                pass
-        shutil.copystat(src, dst)
+        shutil.copy2(src, dst)
     else:
         print(F"DryRun: copy {src} \n\t\t---> {dst}")
 

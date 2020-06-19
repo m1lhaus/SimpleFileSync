@@ -107,7 +107,7 @@ What if we messed up our local copy of files due to some accidental write and we
 
 ```
 > python sfsync.py \\net_pc1\\source \\net_pc2\target --summary --dry-run \
-        --one-direction-sync --prefer-source
+        --prefer-source
 ```
 
 ## Licence
