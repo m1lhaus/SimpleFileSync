@@ -125,9 +125,9 @@ def print_summary(index):
         """
         for unit in ['', 'Ki', 'Mi', 'Gi', 'Ti', 'Pi', 'Ei', 'Zi']:
             if abs(num) < 1024.0:
-                return "%7.3f%s%s" % (num, unit, suffix)
+                return "%7.3f%-3s" % (num, unit+suffix)
             num /= 1024.0
-        return "%.1f%s%s" % (num, 'Yi', suffix)
+        return "%.1f%-3s" % (num, 'Yi'+suffix)
 
     print()
     print(Fore.GREEN + "SOURCE:" + Fore.RESET, args.source)
@@ -141,11 +141,22 @@ def print_summary(index):
         source_size, source_time = source_info[1:] if source_info is not None else (None, None)
         target_size, target_time = target_info[1:] if target_info is not None else (None, None)
 
-        source_time_str = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(source_time))
-        target_time_str = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(target_time))
+        source_time_str = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(source_time)) if source_time is not None else "xxxx-xx-xx 00:00:00"
+        target_time_str = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(target_time)) if target_time is not None else "xxxx-xx-xx 00:00:00"
 
         direction_str = Action.labels[direction]
-        time_op = ">" if source_time > target_time else "<"
+
+        # figure out time operator
+        if source_time is None or target_time is None:
+            time_op = "?"
+        elif source_time > target_time:
+            time_op = ">"
+        else:
+            time_op = "<"
+
+        # figure out size operator
+        source_size = source_size if source_size is not None else 0.0
+        target_size = target_size if target_size is not None else 0.0
         if source_size > target_size:
             size_op = ">"
         elif source_size == target_size:
@@ -166,6 +177,10 @@ def remove_file(filepath):
 
 def copy_file(src, dst):
     if not args.dry_run:
+        dirpath = os.path.dirname(dst)
+        if not os.path.isdir(dirpath):
+            os.makedirs(dirpath, exist_ok=True)
+
         shutil.copy2(src, dst)
     else:
         print(F"DryRun: copy {src} \n\t\t---> {dst}")
