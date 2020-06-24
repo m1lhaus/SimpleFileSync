@@ -4,7 +4,11 @@ SimpleFileSync is rsync-like script written in Python. Rsync is a great tool, ho
 
 ## Requirements
 
-No 3rd-party packages are used, just pure Python3. Should work on all platforms.
+As a 3rd-party package only [colorama](https://pypi.org/project/colorama/) is used. 
+
+```
+pip install colorama
+```
 
 ## Usage
 
