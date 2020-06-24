@@ -34,7 +34,7 @@ def list_files(filepath):
     for root, folders, files in os.walk(filepath):
         folders[:] = [d for d in folders if d not in args.exclude_folder_names]
         for ffile in files:
-            if not ffile.endswith(args.exclude_file_ext):
+            if not ffile.lower().endswith(args.exclude_file_ext):
                 output.append(os.path.join(root, ffile))
     return output
 
@@ -261,7 +261,7 @@ if __name__ == '__main__':
 
     args = arg_parser.parse_args()
     args.exclude_folder_names = tuple(args.exclude_folder_names)
-    args.exclude_file_ext = tuple(args.exclude_file_ext)
+    args.exclude_file_ext = tuple([ext.lower() for ext in args.exclude_file_ext])
 
     if not os.path.isdir(args.source):
         raise Exception(f"Source folder path {args.source} does not exist!")
