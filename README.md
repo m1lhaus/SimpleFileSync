@@ -19,7 +19,7 @@ usage: sfsync.py [-h]
                  [--exclude-folder-names EXCLUDE_FOLDER_NAMES [EXCLUDE_FOLDER_NAMES ...]]
                  [--exclude-file-ext EXCLUDE_FILE_EXT [EXCLUDE_FILE_EXT ...]]
                  [--one-direction-sync] [--delete-orphans] [--prefer-source]
-                 [--summary] [--dry-run]
+                 [--summary] [--dry-run] [--max_workers MAX_WORKERS]
                  source target
 
 Simple file sync script is rsync-like tool written in Python. It can do simple
@@ -55,7 +55,9 @@ optional arguments:
                         recommended to be used together with '--dry-run' to
                         find out first, what will be done.
   --dry-run             Do not copy / remove anything, just simulate actions.
-
+  --max_workers MAX_WORKERS
+                        Number of parallel copy jobs (threads). As default
+                        min(32, os.cpu_count() + 4) is used.
 ```
 
 ## Examples
