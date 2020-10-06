@@ -12,6 +12,21 @@ from colorama import Fore
 from concurrent.futures import ThreadPoolExecutor
 
 
+def _copyfileobj_patched(fsrc, fdst, length=1024*1024):
+    """
+    Custom implementation of copyfileobj() method from shutil that uses bigger buffer. Windows don't really like small buffers python<3.8 uses.
+    Here 1 MB buffer is used as in python3.8.
+    """
+    # Localize variable access to minimize overhead.
+    fsrc_read = fsrc.read
+    fdst_write = fdst.write
+    while True:
+        buf = fsrc_read(length)
+        if not buf:
+            break
+        fdst_write(buf)
+
+
 class Action:
     COPY_SOURCE_TO_TARGET = 0
     COPY_TARGET_TO_SOURCE = 1
@@ -215,6 +230,7 @@ def main():
     if args.summary:
         print_summary(copy_index)
 
+    t0 = time.time()
     print(F"Coping started at {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time()))}")
 
     workers = []
@@ -236,9 +252,12 @@ def main():
     if all(results):
         print()
         print(F"Done at {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time()))}")
+        print(F"Total time elapsed: {time.time() - t0} sec")
 
 
 if __name__ == '__main__':
+    if sys.version_info[0] < 3 or sys.version_info[1] < 8:
+        shutil.copyfileobj = _copyfileobj_patched       # Windows don't like small cache for big files to copy, this was reworked in Python3.8
 
     arg_parser = argparse.ArgumentParser(description="Simple file sync script is rsync-like tool written in Python. "
                                                      "It can do simple both-ways sync between source and target file tress. "
@@ -257,8 +276,8 @@ if __name__ == '__main__':
     arg_parser.add_argument('--prefer-source', action="store_true", help="When set, source file is always considered to be the latest one.")
     arg_parser.add_argument('--summary', action="store_true", help="Print summary table with files to be changed. "
                                                                    " is recommended to be used together with '--dry-run' to find out first, what will be done.")
-    arg_parser.add_argument('--dry-run', action="store_true", default=None, help="Do not copy / remove anything, just simulate actions.")
-    arg_parser.add_argument('--max_workers', type=int, help="Number of parallel copy jobs (threads). As default min(32, os.cpu_count() + 4) is used.")
+    arg_parser.add_argument('--dry-run', action="store_true", help="Do not copy / remove anything, just simulate actions.")
+    arg_parser.add_argument('--max-workers', type=int, default=None, help="Number of parallel copy jobs (threads). As default min(32, os.cpu_count() + 4) is used.")
     args = arg_parser.parse_args()
     args.exclude_folder_names = tuple(args.exclude_folder_names)
     args.exclude_file_ext = tuple([ext.lower() for ext in args.exclude_file_ext])

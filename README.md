@@ -55,9 +55,10 @@ optional arguments:
                         recommended to be used together with '--dry-run' to
                         find out first, what will be done.
   --dry-run             Do not copy / remove anything, just simulate actions.
-  --max_workers MAX_WORKERS
+  --max-workers MAX_WORKERS
                         Number of parallel copy jobs (threads). As default
                         min(32, os.cpu_count() + 4) is used.
+
 ```
 
 ## Examples
