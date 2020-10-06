@@ -218,7 +218,7 @@ def main():
     print(F"Coping started at {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time()))}")
 
     workers = []
-    with ThreadPoolExecutor(1 if args.dry_run else None) as pool:
+    with ThreadPoolExecutor(1 if args.dry_run else args.max_workers) as pool:
         for data in copy_index.values():
             workers.append(pool.submit(execute_action, data))
 
@@ -257,8 +257,8 @@ if __name__ == '__main__':
     arg_parser.add_argument('--prefer-source', action="store_true", help="When set, source file is always considered to be the latest one.")
     arg_parser.add_argument('--summary', action="store_true", help="Print summary table with files to be changed. "
                                                                    " is recommended to be used together with '--dry-run' to find out first, what will be done.")
-    arg_parser.add_argument('--dry-run', action="store_true", help="Do not copy / remove anything, just simulate actions.")
-
+    arg_parser.add_argument('--dry-run', action="store_true", default=None, help="Do not copy / remove anything, just simulate actions.")
+    arg_parser.add_argument('--max_workers', type=int, help="Number of parallel copy jobs (threads). As default min(32, os.cpu_count() + 4) is used.")
     args = arg_parser.parse_args()
     args.exclude_folder_names = tuple(args.exclude_folder_names)
     args.exclude_file_ext = tuple([ext.lower() for ext in args.exclude_file_ext])
