@@ -39,19 +39,35 @@ class Action:
     }
 
 
-def list_files(filepath):
+class PathType:
+    FILE = 0
+    FOLDER = 1
+
+
+class PathInfo:
+    def __init__(self, pathtype, abspath, filesize=None, modtime=None):
+        self.pathtype = pathtype
+        self.abspath = abspath
+        self.filesize = filesize
+        self.modtime = modtime
+
+
+def list_folder_tree(filepath):
     """
     Method recursively lists all files from given root folder.
     Optionally folder names from args.exclude_folder_names can be skipped.
     Optionally file with file extensions args.exclude_file_ext can be skipped.
     """
-    output = []
+    file_list = []
+    folder_list = []
     for root, folders, files in os.walk(filepath):
-        folders[:] = [d for d in folders if d not in args.exclude_folder_names]
+        folders[:] = [dirname for dirname in folders if dirname not in args.exclude_folder_names]       # this will make os.walk to skip those folders
         for ffile in files:
             if not ffile.lower().endswith(args.exclude_file_ext):
-                output.append(os.path.join(root, ffile))
-    return output
+                file_list.append(os.path.join(root, ffile))
+        folder_list.append(root)
+
+    return folder_list, file_list
 
 
 def get_file_info(filepath):
@@ -64,7 +80,7 @@ def get_file_info(filepath):
     return filepath, size, mt
 
 
-def merge_trees(source_tree, target_tree):
+def merge_trees(source_tree, target_tree, source_folders, target_folders):
     """
     Method takes file lis of source folder and target folder and merges them together into one dict,
     where key is the relpath to the file (rel to source/target root).
@@ -72,12 +88,26 @@ def merge_trees(source_tree, target_tree):
     index = {}
     for path, size, mt in source_tree:
         relpath = os.path.relpath(path, args.source)
-        index[relpath] = [(path, size, mt), None]
+        source_info = PathInfo(PathType.FILE, path, filesize=size, modtime=mt)
+        index[relpath] = (source_info, None)
+    for path in source_folders:
+        relpath = os.path.relpath(path, args.source)
+        source_info = PathInfo(PathType.FOLDER, path)
+        index[relpath] = (source_info, None)
+
     for path, size, mt in target_tree:
         relpath = os.path.relpath(path, args.target)
-        tmp = index.get(relpath, [None, None])
-        tmp[1] = (path, size, mt)
-        index[relpath] = tmp
+        source_info, target_info = index.get(relpath, (None, PathInfo(PathType.FILE, path)))
+        target_info.path = path
+        target_info.filesize = size
+        target_info.modtime = mt
+        index[relpath] = (source_info, target_info)
+    for path in target_folders:
+        relpath = os.path.relpath(path, args.target)
+        source_info, target_info = index.get(relpath, (None, PathInfo(PathType.FOLDER, path)))
+        target_info.path = path
+        index[relpath] = (source_info, target_info)
+
     return index
 
 
@@ -86,46 +116,43 @@ def get_sync_direction(index):
     Based on source and target file properties (does it exists?, their last modification time and size) and input args the method decides
     sync direction. I.e. whether to copy file from source to target or from target to source - or whether to remove target file.
     """
-    copy_index = {}
+    what_to_do_index = {}
 
     for relpath, (source_info, target_info) in index.items():
 
         # source file does not exist
         if source_info is None:
-            source_info = (os.path.join(args.source, relpath), None, None)
+            source_info = PathInfo(target_info.pathtype, os.path.join(args.source, relpath))
             if not args.one_direction_sync:
-                copy_index[relpath] = (Action.COPY_TARGET_TO_SOURCE, source_info, target_info)
+                what_to_do_index[relpath] = (Action.COPY_TARGET_TO_SOURCE, source_info, target_info)
             elif args.delete_orphans:
-                copy_index[relpath] = (Action.REMOVE_TARGET, source_info, target_info)
+                what_to_do_index[relpath] = (Action.REMOVE_TARGET, source_info, target_info)
             else:
                 continue
 
         # target file does not exist
         elif target_info is None:
-            target_info = (os.path.join(args.target, relpath), None, None)
-            copy_index[relpath] = (Action.COPY_SOURCE_TO_TARGET, source_info, target_info)
+            target_info = PathInfo(source_info.pathtype, os.path.join(args.target, relpath))
+            what_to_do_index[relpath] = (Action.COPY_SOURCE_TO_TARGET, source_info, target_info)
 
         # both files exist, do a sync
-        else:
-            _, source_size, source_mt = source_info
-            _, target_size, target_mt = target_info
-
+        elif (source_info.pathtype == PathType.FILE) and (target_info.pathtype == PathType.FILE):
             # files are the same
-            if (source_mt == target_mt) and (source_size == target_size):
+            if (source_info.modtime == target_info.modtime) and (source_info.filesize == target_info.filesize):
                 continue
 
             # source is older
-            elif source_mt < target_mt:
-                copy_index[relpath] = (Action.COPY_TARGET_TO_SOURCE if not args.prefer_source else Action.COPY_SOURCE_TO_TARGET, source_info, target_info)
+            elif source_info.modtime < target_info.modtime:
+                what_to_do_index[relpath] = (Action.COPY_TARGET_TO_SOURCE if not args.prefer_source else Action.COPY_SOURCE_TO_TARGET, source_info, target_info)
 
             # target is older
-            elif source_mt > target_mt:
-                copy_index[relpath] = (Action.COPY_SOURCE_TO_TARGET, source_info, target_info)
+            elif source_info.modtime > target_info.modtime:
+                what_to_do_index[relpath] = (Action.COPY_SOURCE_TO_TARGET, source_info, target_info)
 
             else:
-                raise Exception(F"File {relpath} have same createdTime, but different file size: {source_size} != {target_size}! One of them might be corrupted!")
+                raise Exception(F"File {relpath} have same createdTime, but different file size: {source_info.filesize} != {target_info.filesize}! One of them might be corrupted!")
 
-    return copy_index
+    return what_to_do_index
 
 
 def print_summary(index):
@@ -153,33 +180,30 @@ def print_summary(index):
     print("-"*200)
 
     for relpath, (direction, source_info, target_info) in index.items():
-        source_size, source_time = source_info[1:] if source_info is not None else (None, None)
-        target_size, target_time = target_info[1:] if target_info is not None else (None, None)
-
-        source_time_str = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(source_time)) if source_time is not None else "xxxx-xx-xx 00:00:00"
-        target_time_str = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(target_time)) if target_time is not None else "xxxx-xx-xx 00:00:00"
+        source_time_str = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(source_info.modtime)) if source_info.modtime is not None else "xxxx-xx-xx 00:00:00"
+        target_time_str = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(target_info.modtime)) if target_info.modtime is not None else "xxxx-xx-xx 00:00:00"
 
         direction_str = Action.labels[direction]
 
         # figure out time operator
-        if source_time is None or target_time is None:
+        if source_info.modtime is None or target_info.modtime is None:
             time_op = "?"
-        elif source_time > target_time:
+        elif source_info.modtime > target_info.modtime:
             time_op = ">"
         else:
             time_op = "<"
 
         # figure out size operator
-        source_size = source_size if source_size is not None else 0.0
-        target_size = target_size if target_size is not None else 0.0
-        if source_size > target_size:
+        source_info.filesize = source_info.filesize if source_info.filesize is not None else 0.0
+        target_info.filesize = target_info.filesize if target_info.filesize is not None else 0.0
+        if source_info.filesize > target_info.filesize:
             size_op = ">"
-        elif source_size == target_size:
+        elif source_info.filesize == target_info.filesize:
             size_op = "="
         else:
             size_op = "<"
 
-        print(F"{direction_str:17s} | {source_time_str} {time_op} {target_time_str} | {sizeof_fmt(source_size)} {size_op} {sizeof_fmt(target_size)} | {relpath}")
+        print(F"{direction_str:17s} | {source_time_str} {time_op} {target_time_str} | {sizeof_fmt(source_info.filesize)} {size_op} {sizeof_fmt(target_info.filesize)} | {relpath}")
     print()
 
 
@@ -188,6 +212,20 @@ def remove_file(filepath):
         os.remove(filepath)
     else:
         print(F"DryRun: remove {filepath}")
+
+
+def remove_dir(folderpath):
+    if not args.dry_run:
+        shutil.rmtree(folderpath, ignore_errors=True)
+    else:
+        print(F"DryRun: remove {folderpath}")
+
+
+def make_dir(folderpath):
+    if not args.dry_run:
+        os.makedirs(folderpath, exist_ok=True)
+    else:
+        print(F"DryRun: makedir {folderpath}")
 
 
 def copy_file(src, dst):
@@ -201,41 +239,58 @@ def copy_file(src, dst):
         print(F"DryRun: copy {src} \n\t\t---> {dst}")
 
 
-def execute_action(data):
-    action, (source_path, _, _), (target_path, _, _) = data
-
+def execute_file_action(action: Action, source_info: PathInfo, target_info: PathInfo):
     if action == Action.REMOVE_TARGET:
-        remove_file(target_path)
+        remove_file(target_info.abspath)
     elif action == Action.COPY_SOURCE_TO_TARGET:
-        copy_file(source_path, target_path)
+        copy_file(source_info.abspath, target_info.abspath)
     elif action == Action.COPY_TARGET_TO_SOURCE:
-        copy_file(target_path, source_path)
+        copy_file(target_info.abspath, source_info.abspath)
     else:
         raise Exception(F"Unsupported action ID: {action}")
 
+
+def execute_folder_action(action, source_info, target_info):
+    if action == Action.REMOVE_TARGET:
+        remove_dir(target_info.abspath)
+    elif action == Action.COPY_SOURCE_TO_TARGET:
+        make_dir(target_info.abspath)
+    elif action == Action.COPY_TARGET_TO_SOURCE:
+        make_dir(source_info.abspath)
+    else:
+        raise Exception(F"Unsupported action ID: {action}")
+
+
+def execute_action(data):
+    action, source_info, target_info = data
+    if source_info.pathtype == PathType.FILE:
+        execute_file_action(action, source_info, target_info)
+    else:
+        execute_folder_action(action, source_info, target_info)
     return True
 
 
 def main():
     with ThreadPoolExecutor(2) as pool:
-        source_files, target_files = list(pool.map(list_files, [args.source, args.target]))
+        (source_folders, source_files), (target_folders, target_files) = list(pool.map(list_folder_tree, [args.source, args.target]))
 
     with ThreadPoolExecutor() as pool:
         source_files_info = list(pool.map(get_file_info, source_files))
         target_files_info = list(pool.map(get_file_info, target_files))
 
-    index = merge_trees(source_files_info, target_files_info)
-    copy_index = get_sync_direction(index)
+    index = merge_trees(source_files_info, target_files_info, source_folders, target_folders)
+    what_to_do = get_sync_direction(index)
 
     if args.summary:
-        print_summary(copy_index)
+        print_summary(what_to_do)
 
     t0 = time.time()
     print(F"Coping started at {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time()))}")
 
     workers = []
-    with ThreadPoolExecutor(1 if args.dry_run else args.max_workers) as pool:
-        for data in copy_index.values():
+    num_workders = 1 if args.dry_run else args.max_workers
+    with ThreadPoolExecutor(num_workders) as pool:
+        for data in what_to_do.values():
             workers.append(pool.submit(execute_action, data))
 
         n_all = len(workers)
