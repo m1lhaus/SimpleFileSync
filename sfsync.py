@@ -97,15 +97,13 @@ def merge_trees(source_tree, target_tree, source_folders, target_folders):
 
     for path, size, mt in target_tree:
         relpath = os.path.relpath(path, args.target)
-        source_info, target_info = index.get(relpath, (None, PathInfo(PathType.FILE, path)))
-        target_info.path = path
-        target_info.filesize = size
-        target_info.modtime = mt
+        source_info, _ = index.get(relpath, (None, None))
+        target_info = PathInfo(PathType.FILE, path, filesize=size, modtime=mt)
         index[relpath] = (source_info, target_info)
     for path in target_folders:
         relpath = os.path.relpath(path, args.target)
-        source_info, target_info = index.get(relpath, (None, PathInfo(PathType.FOLDER, path)))
-        target_info.path = path
+        source_info, _ = index.get(relpath, (None, None))
+        target_info = PathInfo(PathType.FOLDER, path)
         index[relpath] = (source_info, target_info)
 
     return index
@@ -203,7 +201,7 @@ def print_summary(index):
         else:
             size_op = "<"
 
-        print(F"{direction_str:17s} | {source_time_str} {time_op} {target_time_str} | {sizeof_fmt(source_info.filesize)} {size_op} {sizeof_fmt(target_info.filesize)} | {relpath}")
+        print(F"{direction_str:27s} | {source_time_str} {time_op} {target_time_str} | {sizeof_fmt(source_info.filesize)} {size_op} {sizeof_fmt(target_info.filesize)} | {relpath}")
     print()
 
 
