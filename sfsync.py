@@ -5,6 +5,7 @@ import shutil
 import time
 import argparse
 import sys
+import math
 import colorama
 
 from colorama import Fore
@@ -12,16 +13,40 @@ from colorama import Fore
 from concurrent.futures import ThreadPoolExecutor
 
 
-def _copyfileobj_patched(fsrc, fdst, length=1024*1024):
+def _copyfileobj_patched(fsrc, fdst, length=0):
     """
-    Custom implementation of copyfileobj() method from shutil that uses bigger buffer. Windows don't really like small buffers python<3.8 uses.
-    Here 1 MB buffer is used as in python3.8.
+    Custom implementation of copyfileobj() method from shutil that uses custom buffer size.
+    Windows don't really like small buffers so we can gain speedup by using bigger buffer for bigger file (less overhead).
+    Python 3.8+ uses as default buffer size 1MB. But here we scale beyond 1MB as src file grows biggers.
     """
+    file_size_B = os.fstat(fsrc.fileno()).st_size
+
+    """
+    Applied funtion:
+    1.0e+00 B -> 1024.0 kB
+    1.0e+01 B -> 1024.0 kB
+    1.0e+02 B -> 1024.0 kB
+    1.0e+03 B -> 1024.0 kB
+    1.0e+04 B -> 1024.0 kB
+    1.0e+05 B -> 1024.0 kB
+    1.0e+06 B -> 1024.0 kB   ... 1MB file has 1MB buffer
+    1.0e+07 B -> 3331.6 kB
+    1.0e+08 B -> 6733.2 kB
+    1.0e+09 B -> 10134.9 kB  ... 1GB file has 10MB buffer
+    1.0e+10 B -> 13536.5 kB
+    """
+    buffer_size_kB = (math.log2(file_size_B) - 20) * 1024
+    buffer_size_kB = max(buffer_size_kB, 1024)
+
+    buffer_size_B = int(buffer_size_kB*1024)
+    if length > 0:
+        buffer_size_B = min(length, buffer_size_B)
+
     # Localize variable access to minimize overhead.
     fsrc_read = fsrc.read
     fdst_write = fdst.write
     while True:
-        buf = fsrc_read(length)
+        buf = fsrc_read(buffer_size_B)
         if not buf:
             break
         fdst_write(buf)
@@ -309,8 +334,7 @@ def main():
 
 
 if __name__ == '__main__':
-    if sys.version_info[0] < 3 or sys.version_info[1] < 8:
-        shutil.copyfileobj = _copyfileobj_patched       # Windows don't like small cache for big files to copy, this was reworked in Python3.8
+    shutil.copyfileobj = _copyfileobj_patched       # custom copy function since Windows don't like small cache for big files to copy
 
     arg_parser = argparse.ArgumentParser(description="Simple file sync script is rsync-like tool written in Python. "
                                                      "It can do simple both-ways sync between source and target file tress. "
