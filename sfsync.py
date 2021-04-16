@@ -35,7 +35,7 @@ def _copyfileobj_patched(fsrc, fdst, length=0):
     1.0e+09 B -> 10134.9 kB  ... 1GB file has 10MB buffer
     1.0e+10 B -> 13536.5 kB
     """
-    buffer_size_kB = (math.log2(file_size_B) - 20) * 1024
+    buffer_size_kB = (math.log2(max(file_size_B, 1)) - 20) * 1024
     buffer_size_kB = max(buffer_size_kB, 1024)
 
     buffer_size_B = int(buffer_size_kB*1024)
