@@ -77,6 +77,16 @@ class PathInfo:
         self.modtime = modtime
 
 
+def winapi_path(path):
+    """
+    This is a official workaround to make long paths work under Windows .
+    """
+    if path.startswith(u"\\\\"):
+        return u"\\\\?\\UNC\\" + path[2:]
+    else:
+        return u"\\\\?\\" + path
+
+
 def list_folder_tree(filepath):
     """
     Method recursively lists all files from given root folder.
@@ -89,7 +99,8 @@ def list_folder_tree(filepath):
         folders[:] = [dirname for dirname in folders if dirname not in args.exclude_folder_names]       # this will make os.walk to skip those folders
         for ffile in files:
             if not ffile.lower().endswith(args.exclude_file_ext):
-                file_list.append(os.path.join(root, ffile))
+                path = os.path.abspath(os.path.join(root, ffile))
+                file_list.append(path)
         folder_list.append(root)
 
     return folder_list, file_list
@@ -358,6 +369,12 @@ if __name__ == '__main__':
     args = arg_parser.parse_args()
     args.exclude_folder_names = tuple(args.exclude_folder_names)
     args.exclude_file_ext = tuple([ext.lower() for ext in args.exclude_file_ext])
+
+    args.source = os.path.abspath(args.source)
+    args.target = os.path.abspath(args.target)
+    if os.name == "nt":
+        args.source = winapi_path(args.source)
+        args.target = winapi_path(args.target)
 
     if not os.path.isdir(args.source):
         raise Exception(f"Source folder path {args.source} does not exist!")
