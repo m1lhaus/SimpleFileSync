@@ -53,14 +53,14 @@ def _copyfileobj_patched(fsrc, fdst, length=0):
 
 
 class Action:
-    COPY_SOURCE_TO_TARGET = 0
-    COPY_TARGET_TO_SOURCE = 1
-    REMOVE_TARGET = 2
+    REMOVE_TARGET = 0
+    COPY_SOURCE_TO_TARGET = 1
+    COPY_TARGET_TO_SOURCE = 2
 
     labels = {
-        0: Fore.GREEN + "SOURCE --> TARGET" + Fore.RESET,
-        1: Fore.YELLOW + "TARGET --> SOURCE" + Fore.RESET,
-        2: Fore.RED + "REMOVE_ON_TARGET" + Fore.RESET
+        0: Fore.RED + "REMOVE_ON_TARGET" + Fore.RESET,
+        1: Fore.GREEN + "SOURCE --> TARGET" + Fore.RESET,
+        2: Fore.YELLOW + "TARGET --> SOURCE" + Fore.RESET
     }
 
 
@@ -81,10 +81,12 @@ def winapi_path(path):
     """
     This is a official workaround to make long paths work under Windows .
     """
-    if path.startswith(u"\\\\"):
-        return u"\\\\?\\UNC\\" + path[2:]
-    else:
-        return u"\\\\?\\" + path
+    if os.name == "nt":
+        if path.startswith(u"\\\\"):
+            return u"\\\\?\\UNC\\" + path[2:]
+        else:
+            return u"\\\\?\\" + path
+    return path
 
 
 def list_folder_tree(filepath):
@@ -102,7 +104,7 @@ def list_folder_tree(filepath):
                 path = os.path.abspath(os.path.join(root, ffile))
                 file_list.append(path)
         folder_list.append(root)
-
+    print("Folder tree", filepath, "listed")
     return folder_list, file_list
 
 
@@ -310,7 +312,9 @@ def main():
 
     with ThreadPoolExecutor() as pool:
         source_files_info = list(pool.map(get_file_info, source_files))
+        print("Source files info retrieved")
         target_files_info = list(pool.map(get_file_info, target_files))
+        print("Target files info retrieved")
 
     index = merge_trees(source_files_info, target_files_info, source_folders, target_folders)
     what_to_do = get_sync_direction(index)
@@ -324,7 +328,7 @@ def main():
     workers = []
     num_workders = 1 if args.dry_run else args.max_workers
     with ThreadPoolExecutor(num_workders) as pool:
-        for data in what_to_do.values():
+        for data in sorted(what_to_do.values(), key=lambda tup: tup[0]):
             workers.append(pool.submit(execute_action, data))
 
         n_all = len(workers)
@@ -372,9 +376,6 @@ if __name__ == '__main__':
 
     args.source = os.path.abspath(args.source)
     args.target = os.path.abspath(args.target)
-    if os.name == "nt":
-        args.source = winapi_path(args.source)
-        args.target = winapi_path(args.target)
 
     if not os.path.isdir(args.source):
         raise Exception(f"Source folder path {args.source} does not exist!")
